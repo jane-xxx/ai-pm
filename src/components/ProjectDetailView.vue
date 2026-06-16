@@ -142,16 +142,39 @@ const handleReanalyze = () => {
 
 // 继续分析
 const handleContinueAnalysis = () => {
+  console.log('[ProjectDetailView] handleContinueAnalysis called')
   if (project.value?.analysisState) {
+    console.log('[ProjectDetailView] Project has analysisState:', {
+      currentState: project.value.analysisState.currentState,
+      currentStepIndex: project.value.analysisState.currentStepIndex,
+      logsCount: project.value.analysisState.logs?.length,
+      resultsCount: project.value.analysisState.results?.length
+    })
+
     // 重置分析启动标志，允许从断点继续
     resetAnalysisStartedFlag()
 
     // 设置为当前项目
+    console.log('[ProjectDetailView] Setting currentProject:', project.value.id)
     projectStore.setCurrentProject(project.value.id)
 
     // 恢复分析状态
     const state = project.value.analysisState
-    const startFromStep = state.currentStepIndex || 0
+
+    // 计算正确的起始步骤：
+    // - 如果有results，说明之前的步骤已经完成，应该从下一步开始
+    // - 例如：3个结果说明步骤0（信息采集）已完成，应该从步骤1（决策分析）开始
+    // - currentStepIndex 可能不准确（由于之前的bug），所以优先使用结果数量来判断
+    const resultsCount = state.results?.length || 0
+    let startFromStep = 0
+
+    // 每个步骤产生3个结果，所以根据结果数量推断已完成步骤数
+    // 3个结果 = 步骤0完成，从步骤1开始
+    // 6个结果 = 步骤0和1完成，从步骤2开始
+    const completedSteps = Math.floor(resultsCount / 3)
+    startFromStep = completedSteps
+
+    console.log('[ProjectDetailView] Calculated startFromStep:', startFromStep, '(based on', resultsCount, 'results)')
 
     // 设置覆盖的起始步骤（用于断点续传）
     setOverrideStartStep(startFromStep)
@@ -167,8 +190,11 @@ const handleContinueAnalysis = () => {
       userResponses: new Map(Object.entries(state.userResponses))
     })
 
+    console.log('[ProjectDetailView] State restored, navigating to workspace')
     // 导航到工作台并传递项目ID（useMockAnalysis 会从 startFromStep 继续执行）
     router.push({ name: 'workspace', params: { projectId: project.value.id } })
+  } else {
+    console.log('[ProjectDetailView] No analysisState found on project')
   }
 }
 
@@ -183,8 +209,8 @@ const handleDelete = () => {
 
 <style lang="less" scoped>
 .project-detail-view {
-  padding: 24px;
-  max-width: 900px;
+  padding: 32px;
+  max-width: 1200px;
   margin: 0 auto;
 }
 

@@ -109,10 +109,12 @@ const handleStart = () => {
   if (inputValue.value.trim()) {
     // 先创建项目
     const newProject = projectStore.createProject({ description: inputValue.value })
+    // 设置为当前项目
+    projectStore.setCurrentProject(newProject.id)
     // 启动分析
     analysisStore.startAnalysis(inputValue.value)
-    // 导航到工作台并传递项目ID
-    router.push({ name: 'workspace', params: { projectId: newProject.id } })
+    // 导航到工作台（新建项目不需要传递项目ID）
+    router.push({ name: 'workspace' })
   }
 }
 </script>

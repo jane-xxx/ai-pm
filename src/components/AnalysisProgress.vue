@@ -49,7 +49,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, nextTick } from 'vue'
 
 interface Step {
   id: string
@@ -61,38 +61,24 @@ interface Step {
 
 const steps = ref<Step[]>([
   {
-    id: 'requirement',
-    title: 'Requirement Agent',
-    subtitle: '需求分析代理',
-    description: '分析产品需求，拆解功能模块和核心需求点',
+    id: 'info-collection',
+    title: '信息采集',
+    subtitle: '并行执行3个子Agent',
+    description: '同时执行需求分析、用户研究、竞品分析，全面收集产品信息',
     status: 'pending'
   },
   {
-    id: 'user-research',
-    title: 'User Research Agent',
-    subtitle: '用户研究代理',
-    description: '分析目标用户，挖掘用户痛点和使用场景',
+    id: 'decision-analysis',
+    title: '决策分析',
+    subtitle: '顺序执行3个子Agent',
+    description: '依次执行信息融合、产品决策、PRD输出结构，确定产品方案',
     status: 'pending'
   },
   {
-    id: 'competitor',
-    title: 'Competitor Agent',
-    subtitle: '竞品分析代理',
-    description: '分析竞品情况，识别市场机会和差异化优势',
-    status: 'pending'
-  },
-  {
-    id: 'solution',
-    title: 'Solution Agent',
-    subtitle: '方案设计代理',
-    description: '基于分析结果，设计产品方案和功能架构',
-    status: 'pending'
-  },
-  {
-    id: 'prd',
-    title: 'PRD Agent',
-    subtitle: 'PRD 生成代理',
-    description: '生成完整的 PRD 文档',
+    id: 'prd-generation',
+    title: 'PRD生成',
+    subtitle: '按PRD结构生成文档',
+    description: '基于PRD输出结构，生成完整的产品需求文档（PRD）',
     status: 'pending'
   }
 ])
@@ -103,36 +89,65 @@ const completedCount = computed(() =>
 
 // 更新步骤状态
 const updateStep = (id: string, status: 'pending' | 'active' | 'completed') => {
+  const timestamp = new Date().toISOString().split('T')[1].slice(0, -1)
+  const beforeState = steps.value.map(s => ({ id: s.id, status: s.status }))
+  console.log(`[AnalysisProgress ${timestamp}] updateStep START:`, { id, status, beforeState })
+
+  // 特殊处理重置信号
+  if (id === '__reset__') {
+    console.log('[AnalysisProgress] Reset signal received, resetting all steps to pending')
+    reset()
+    // 重要：重置后等待 Vue 更新完成，确保 UI 渲染 'pending' 状态
+    nextTick(() => {
+      console.log('[AnalysisProgress] Reset complete, UI updated to pending')
+    })
+    return
+  }
+
   const stepIndex = steps.value.findIndex(s => s.id === id)
-  if (stepIndex === -1) return
+  if (stepIndex === -1) {
+    // 子步骤ID（如 requirement, user-research 等），不处理
+    console.log(`[AnalysisProgress] Skipping sub-step: ${id}`)
+    return
+  }
 
   const step = steps.value[stepIndex]
-	  console.log('[AnalysisProgress] updateStep:', id, status, 'current:', step.status)
+  const oldStatus = step.status
   step.status = status
-
-  // 当标记为 completed 时，激活下一步
-  if (status === 'completed' && stepIndex < steps.value.length - 1) {
-    steps.value[stepIndex + 1].status = 'active'
-  }
+  console.log(`[AnalysisProgress] Step ${id} status changed: ${oldStatus} -> ${status}`)
+  console.log(`[AnalysisProgress] After update:`, steps.value.map(s => ({ id: s.id, status: s.status })))
 }
 
 // 重置所有步骤
 const reset = () => {
-  steps.value.forEach((s, i) => {
-    s.status = i === 0 ? 'active' : 'pending'
+  console.log('[AnalysisProgress] reset() called, setting all steps to pending')
+  steps.value.forEach((s) => {
+    s.status = 'pending'
   })
+  console.log('[AnalysisProgress] reset() complete, all steps:', steps.value.map(s => ({ id: s.id, status: s.status })))
 }
 
 // 启动分析（激活第一步）
 const startAnalysis = () => {
+  console.log('[AnalysisProgress] startAnalysis() called, activating first step')
   steps.value[0].status = 'active'
 }
 
 // 根据当前步骤索引初始化状态（用于断点续传）
 const initFromStep = (currentStepIndex: number) => {
   // currentStepIndex 是下一个要执行的步骤索引（0-based）
-  // 例如 currentStepIndex = 3 表示步骤 0,1,2 已完成，步骤 3 进行中
+  // 例如 currentStepIndex = 1 表示步骤 0 已完成，步骤 1 进行中
   console.log('[AnalysisProgress] initFromStep called with currentStepIndex:', currentStepIndex)
+
+  // 边界检查：如果 currentStepIndex 超出范围，说明分析已完成
+  if (currentStepIndex >= steps.value.length) {
+    console.log('[AnalysisProgress] currentStepIndex out of bounds, marking all steps as completed')
+    steps.value.forEach((s) => {
+      s.status = 'completed'
+    })
+    return
+  }
+
   steps.value.forEach((s, i) => {
     const oldStatus = s.status
     if (i < currentStepIndex) {

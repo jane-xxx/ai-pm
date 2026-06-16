@@ -36,11 +36,24 @@
     </div>
 
     <!-- 内容区域 -->
-    <div ref="resultsContentRef" v-else class="results-content">
-      <!-- 分析结果列表 - 直接显示完整内容，使用淡入动画 -->
-      <div class="analysis-results">
+    <div v-else class="results-content">
+      <!-- Tab 切换 -->
+      <div class="results-tabs">
+        <button
+          v-for="tab in tabs"
+          :key="tab.key"
+          class="tab-button"
+          :class="{ active: activeTab === tab.key }"
+          @click="activeTab = tab.key"
+        >
+          {{ tab.title }}
+        </button>
+      </div>
+
+      <!-- 分析结果列表 -->
+      <div ref="resultsContentRef" class="analysis-results">
         <div
-          v-for="result in results"
+          v-for="result in filteredResults"
           :key="result.id"
           class="result-item fade-in"
         >
@@ -52,6 +65,16 @@
             {{ result.content }}
           </div>
         </div>
+
+        <!-- 空状态 -->
+        <div v-if="filteredResults.length === 0" class="empty-state">
+          <div class="empty-icon">
+            <div class="pulse-dot"></div>
+            <div class="pulse-dot"></div>
+            <div class="pulse-dot"></div>
+          </div>
+          <p>该阶段的分析结果即将呈现...</p>
+        </div>
       </div>
     </div>
   </div>
@@ -62,6 +85,45 @@ import { ref, computed, watch, nextTick } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useAnalysisStore } from '@/stores/analysis'
 import { useAutoScroll } from '@/composables/useAutoScroll'
+
+// Tab 定义
+interface Tab {
+  key: string
+  title: string
+  // 信息采集阶段的结果ID
+  infoCollectionIds: string[]
+  // 决策分析阶段的结果ID
+  decisionAnalysisIds: string[]
+  // PRD生成阶段的结果ID
+  prdIds: string[]
+}
+
+const tabs: Tab[] = [
+  {
+    key: 'info-collection',
+    title: '信息采集',
+    infoCollectionIds: ['r1', 'r2', 'r3'],
+    decisionAnalysisIds: [],
+    prdIds: []
+  },
+  {
+    key: 'decision-analysis',
+    title: '决策分析',
+    infoCollectionIds: [],
+    decisionAnalysisIds: ['r4', 'r5', 'r6'],
+    prdIds: []
+  },
+  {
+    key: 'prd-generation',
+    title: 'PRD生成',
+    infoCollectionIds: [],
+    decisionAnalysisIds: [],
+    prdIds: ['r7']
+  }
+]
+
+// 当前激活的 tab
+const activeTab = ref<string>('info-collection')
 
 // 获取分析状态
 const analysisStore = useAnalysisStore()
@@ -77,7 +139,6 @@ watch(results, onResultsContentChange, { deep: true })
 // 监听元素出现（从 loading 状态切换到内容状态）
 watch(resultsContentRef, (element) => {
   if (element) {
-    // 元素出现时，初始化滚动
     initResultsScroll(element)
   }
 })
@@ -86,6 +147,75 @@ watch(resultsContentRef, (element) => {
 const showLoading = computed(() => {
   return results.value.length === 0
 })
+
+// 获取指定 tab 的结果
+const getTabResults = (tabKey: string) => {
+  const tab = tabs.find(t => t.key === tabKey)
+  if (!tab) return []
+
+  const allIds = [...tab.infoCollectionIds, ...tab.decisionAnalysisIds, ...tab.prdIds]
+  return results.value.filter(r => allIds.includes(r.id))
+}
+
+// 获取指定 tab 的结果数量
+const getTabCount = (tabKey: string) => {
+  const tabResults = getTabResults(tabKey)
+  const tab = tabs.find(t => t.key === tabKey)
+  if (!tab) return 0
+
+  const totalCount = tab.infoCollectionIds.length + tab.decisionAnalysisIds.length + tab.prdIds.length
+  return `${tabResults.length}/${totalCount}`
+}
+
+// 判断指定 tab 是否已完成
+const isTabCompleted = (tabKey: string) => {
+  const tab = tabs.find(t => t.key === tabKey)
+  if (!tab) return false
+
+  const allIds = [...tab.infoCollectionIds, ...tab.decisionAnalysisIds, ...tab.prdIds]
+  const tabResults = results.value.filter(r => allIds.includes(r.id))
+  return tabResults.length === allIds.length
+}
+
+// 当前 tab 的过滤结果
+const filteredResults = computed(() => {
+  return getTabResults(activeTab.value)
+})
+
+// 监听结果长度变化，当结果被清空时（新建项目）重置 tab
+watch(() => results.value.length, (newLength, oldLength) => {
+  // 如果从有结果变为无结果，说明是新建项目，重置 tab
+  if (oldLength > 0 && newLength === 0) {
+    activeTab.value = 'info-collection'
+  }
+})
+
+// 监听结果变化，自动切换到下一个 tab
+watch(results, (newResults) => {
+  // 检查信息采集是否完成（r1, r2, r3 都有了）
+  const infoCollectionIds = ['r1', 'r2', 'r3']
+  const hasInfoCollection = newResults.some(r => infoCollectionIds.includes(r.id))
+  const infoCollectionComplete = infoCollectionIds.every(id =>
+    newResults.some(r => r.id === id)
+  )
+
+  // 如果信息采集已完成且当前还在信息采集tab，切换到决策分析
+  if (infoCollectionComplete && activeTab.value === 'info-collection') {
+    activeTab.value = 'decision-analysis'
+  }
+
+  // 检查决策分析是否完成（r4, r5, r6 都有了）
+  const decisionAnalysisIds = ['r4', 'r5', 'r6']
+  const hasDecisionAnalysis = newResults.some(r => decisionAnalysisIds.includes(r.id))
+  const decisionAnalysisComplete = decisionAnalysisIds.every(id =>
+    newResults.some(r => r.id === id)
+  )
+
+  // 如果决策分析已完成且当前还在决策分析tab，切换到PRD生成
+  if (decisionAnalysisComplete && activeTab.value === 'decision-analysis') {
+    activeTab.value = 'prd-generation'
+  }
+}, { deep: true })
 </script>
 
 <style lang="less" scoped>
@@ -254,12 +384,59 @@ const showLoading = computed(() => {
 // === 内容区域 ===
 .results-content {
   flex: 1;
-  overflow-y: auto;
-  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+// === Tab 切换 ===
+.results-tabs {
+  display: flex;
+  gap: 32px;
+  padding: 16px 20px 0;
+  background: white;
+  border-bottom: 1px solid #F1F5F9;
+}
+
+.tab-button {
+  position: relative;
+  padding: 0 0 12px;
+  background: transparent;
+  border: none;
+  font-size: 14px;
+  font-weight: 500;
+  color: #94A3B8;
+  cursor: pointer;
+  transition: color 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+
+  &:hover {
+    color: #7C3AED;
+  }
+
+  &.active {
+    color: #7C3AED;
+
+    &::after {
+      content: '';
+      position: absolute;
+      bottom: -1px;
+      left: 0;
+      right: 0;
+      height: 2px;
+      background: #7C3AED;
+      border-radius: 2px 2px 0 0;
+    }
+  }
 }
 
 // === 分析结果列表 ===
 .analysis-results {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px;
   display: flex;
   flex-direction: column;
   gap: 16px;
@@ -324,22 +501,66 @@ const showLoading = computed(() => {
   white-space: pre-wrap;
 }
 
-.typing-cursor {
-  display: inline-block;
-  width: 2px;
-  height: 16px;
-  background: #7C3AED;
-  margin-left: 2px;
-  vertical-align: middle;
-  animation: cursorBlink 0.8s infinite;
+// === 空状态 ===
+.empty-state {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: #9CA3AF;
+  padding: 60px 20px;
 }
 
-@keyframes cursorBlink {
-  0%, 50% {
+.empty-icon {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.pulse-dot {
+  width: 12px;
+  height: 12px;
+  background: #7C3AED;
+  border-radius: 50%;
+  animation: pulseDot 1.4s ease-in-out infinite;
+
+  &:nth-child(1) {
+    animation-delay: 0s;
+  }
+
+  &:nth-child(2) {
+    animation-delay: 0.2s;
+  }
+
+  &:nth-child(3) {
+    animation-delay: 0.4s;
+  }
+}
+
+@keyframes pulseDot {
+  0%, 80%, 100% {
+    transform: scale(0.6);
+    opacity: 0.4;
+  }
+  40% {
+    transform: scale(1);
     opacity: 1;
   }
-  51%, 100% {
-    opacity: 0;
+}
+
+.empty-state p {
+  margin: 0;
+  font-size: 14px;
+  animation: fadeInText 2s ease-in-out infinite;
+
+  @keyframes fadeInText {
+    0%, 100% {
+      opacity: 0.6;
+    }
+    50% {
+      opacity: 1;
+    }
   }
 }
 </style>

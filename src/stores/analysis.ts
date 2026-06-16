@@ -78,6 +78,7 @@ export const useAnalysisStore = defineStore('analysis', () => {
     // 清除当前问题，继续分析
     currentQuestion.value = null
     currentState.value = AnalysisState.ANALYZING
+    currentState.value = AnalysisState.ANALYZING
   }
 
   // 添加结果
@@ -87,6 +88,7 @@ export const useAnalysisStore = defineStore('analysis', () => {
 
   // 开始分析
   const startAnalysis = (idea: string) => {
+    console.log('[AnalysisStore] startAnalysis called with idea:', idea)
     originalIdea.value = idea
     logs.value = []
     results.value = []
@@ -98,6 +100,7 @@ export const useAnalysisStore = defineStore('analysis', () => {
       userResponses.value = new Map()
     }
     currentState.value = AnalysisState.ANALYZING
+    console.log('[AnalysisStore] currentState set to ANALYZING')
   }
 
   // 完成分析

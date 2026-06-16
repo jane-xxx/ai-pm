@@ -18,6 +18,7 @@ export interface Project {
     currentQuestion: any
     questionHistory: any[]
     userResponses: any
+    currentStepIndex?: number  // 下一步要执行的步骤索引
   }
 }
 
@@ -126,17 +127,26 @@ export const useProjectStore = defineStore('project', () => {
   const saveAnalysisState = (projectId: string, analysisState: any, currentStepIndex: number = 0) => {
     const project = projects.value.find(p => p.id === projectId)
     if (project) {
+      // 安全地获取 ref 的值（如果存在）
+      const getValue = (ref: any) => ref && typeof ref === 'object' && 'value' in ref ? ref.value : ref
+
       project.analysisState = {
-        currentState: analysisState.currentState,
-        originalIdea: analysisState.originalIdea,
-        logs: analysisState.logs,
-        results: analysisState.results,
-        currentQuestion: analysisState.currentQuestion,
-        questionHistory: analysisState.questionHistory,
-        userResponses: Array.from(analysisState.userResponses),
+        currentState: getValue(analysisState.currentState),
+        originalIdea: getValue(analysisState.originalIdea),
+        logs: getValue(analysisState.logs),
+        results: getValue(analysisState.results),
+        currentQuestion: getValue(analysisState.currentQuestion),
+        questionHistory: getValue(analysisState.questionHistory),
+        userResponses: Array.from(getValue(analysisState.userResponses) || []),
         currentStepIndex // 记录当前进行到第几步
       }
       project.updatedAt = Date.now()
+      console.log('[ProjectStore] Saved analysisState for project', projectId, ':', {
+        currentState: project.analysisState.currentState,
+        currentStepIndex: project.analysisState.currentStepIndex,
+        resultsCount: project.analysisState.results?.length || 0,
+        logsCount: project.analysisState.logs?.length || 0
+      })
     }
   }
 

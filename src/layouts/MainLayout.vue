@@ -33,9 +33,6 @@ const projectStore = useProjectStore()
 
 const showNewProjectModal = ref(false)
 
-// 当前分析步骤索引（用于断点续传）
-const currentStepIndex = ref(0)
-
 // 当前视图根据路由计算
 const currentView = computed(() => route.name as string)
 
@@ -70,8 +67,8 @@ const handleProjectCreated = (data: { description: string }) => {
   const newProject = projectStore.createProject(data)
   // 在 analysisStore 中启动分析
   analysisStore.startAnalysis(data.description)
-  // 切换到工作台视图并传递项目ID
-  router.push({ name: 'workspace', params: { projectId: newProject.id } })
+  // 切换到工作台视图（新建项目不传递项目ID）
+  router.push({ name: 'workspace' })
   showNewProjectModal.value = false
 }
 
@@ -84,12 +81,8 @@ watch(
       analysisStore.addLog('开始分析产品想法...', LogType.INFO)
     }
 
-    // 分析进行中时，保存分析状态到项目
-    if (newState === 'analyzing' && projectStore.currentProject) {
-      // 当前步骤索引 = 已完成的结果数量
-      currentStepIndex.value = analysisStore.results.length
-      projectStore.saveAnalysisState(projectStore.currentProject.id, analysisStore, currentStepIndex.value)
-    }
+    // 注意：分析状态的断点续传由 mockAnalysis.ts 中的 onStepComplete 回调处理
+    // 不需要在这里保存 currentStepIndex，避免与 mockAnalysis.ts 的逻辑冲突
 
     // 分析完成时，更新项目状态并保存结果
     if (newState === 'completed' && projectStore.currentProject) {
@@ -109,27 +102,14 @@ watch(
       // 清除分析状态（已完成无需恢复）
       projectStore.clearAnalysisState(currentProject.id)
 
-      // 重置步骤索引
-      currentStepIndex.value = 0
-
       // 更新项目时间戳
       currentProject.updatedAt = Date.now()
     }
   }
 )
 
-// 深度监听分析状态变化，自动保存进度
-watch(
-  () => analysisStore,
-  () => {
-    // 只在分析进行中且有当前项目时保存
-    if (analysisStore.currentState === 'analyzing' && projectStore.currentProject) {
-      currentStepIndex.value = analysisStore.results.length
-      projectStore.saveAnalysisState(projectStore.currentProject.id, analysisStore, currentStepIndex.value)
-    }
-  },
-  { deep: true }
-)
+// 注意：分析状态的断点续传由 mockAnalysis.ts 中的 onStepComplete 回调处理
+// currentStepIndex 的管理已移除，避免与 mockAnalysis.ts 的逻辑冲突
 </script>
 
 <style lang="less" scoped>

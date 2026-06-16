@@ -146,18 +146,96 @@ watch(logListRef, (element) => {
   }
 })
 
-// 监听 progressRef 出现后，如果已在分析中且是全新分析，激活第一步
-watch(progressRef, (ref) => {
-  if (ref && isAnalyzing.value) {
-    // 检查是否是断点续传：如果有 analysisState 说明是恢复进度，不需要重新激活第一步
-    const isResuming = currentProject.value?.analysisState !== undefined
-    if (!isResuming) {
-      console.log('[WorkspaceView] progressRef ready, fresh analysis - activating first step')
-      ref.startAnalysis()
+// 记录上次的 analysisState，用于检测变化
+let lastAnalysisState: any = null
+
+// 监听 progressRef 和 currentProject 的 analysisState，处理进度恢复
+watch([progressRef, () => currentProject.value?.analysisState], ([ref, analysisState], [oldRef, oldAnalysisState]) => {
+  console.log('[WorkspaceView] Progress watch triggered:', {
+    hasRef: !!ref,
+    hasAnalysisState: !!analysisState,
+    hadOldAnalysisState: !!oldAnalysisState,
+    isAnalyzing: isAnalyzing.value,
+    stepIndex: analysisState?.currentStepIndex,
+    currentProjectId: currentProject.value?.id,
+    currentState: analysisStore.currentState
+  })
+
+  if (ref) {
+    // 只在断点续传场景下恢复步骤状态
+    // 条件：有 analysisState，之前没有（刚从项目详情页进入），且不是全新分析
+    if (analysisState && !oldAnalysisState) {
+      // 检查是否是断点续传（有结果或问题历史）
+      const isResume = analysisState.results && analysisState.results.length > 0
+      const currentStepIndex = analysisState.currentStepIndex || 0
+
+      if (isResume) {
+        // 断点续传：恢复步骤状态
+        console.log('[WorkspaceView] Restoring steps from breakpoint (resume scenario), currentStepIndex:', currentStepIndex)
+        // initFromStep 会自动处理边界情况：
+        // - currentStepIndex < 3: 恢复到对应步骤
+        // - currentStepIndex >= 3: 标记所有步骤为完成（分析已完成）
+        ref.initFromStep(currentStepIndex)
+      } else {
+        // 全新分析：让主循环控制步骤状态，不调用 initFromStep
+        console.log('[WorkspaceView] Fresh analysis detected, skipping initFromStep to let main loop control')
+      }
+    } else if (!analysisState && isAnalyzing.value) {
+      // 全新分析：不激活任何步骤，让主循环控制
+      console.log('[WorkspaceView] Fresh analysis - step activation controlled by main loop')
     } else {
-      console.log('[WorkspaceView] progressRef ready, resuming from breakpoint - skipping startAnalysis')
+      console.log('[WorkspaceView] Skipping step restoration - conditions not met', {
+        analysisState: !!analysisState,
+        oldAnalysisState: !!oldAnalysisState,
+        isAnalyzing: isAnalyzing.value
+      })
+    }
+
+    // 更新记录
+    lastAnalysisState = analysisState
+  }
+}, { immediate: true })
+
+// 单独监听 progressRef 变化（处理组件稍后挂载的情况）
+watch(progressRef, (newRef, oldRef) => {
+  console.log('[WorkspaceView] progressRef watch triggered:', { newRef: !!newRef, oldRef: !!oldRef, isAnalyzing: isAnalyzing.value })
+
+  // 当 progressRef 从 null 变为有值时
+  if (newRef && !oldRef) {
+    // 设置进度更新器，让 mockAnalysis 能够更新步骤状态
+    setProgressUpdater((stepId: string, status: 'active' | 'completed', description?: string) => {
+      console.log('[WorkspaceView] progressUpdater callback called:', stepId, status)
+      newRef.updateStep(stepId, status, description)
+    })
+    console.log('[WorkspaceView] progressRef became available, progressUpdater set')
+
+    // 如果当前有 analysisState，恢复步骤状态
+    if (currentProject.value?.analysisState && isAnalyzing.value) {
+      const analysisState = currentProject.value.analysisState
+
+      // 根据结果数量计算正确的步骤索引（更可靠）
+      // 每个步骤产生3个结果，所以结果数量 / 3 = 已完成步骤数
+      const resultsCount = analysisState.results?.length || 0
+      const completedSteps = Math.floor(resultsCount / 3)
+
+      console.log('[WorkspaceView] Restoring steps from index:', completedSteps, '(based on', resultsCount, 'results)')
+      newRef.initFromStep(completedSteps)
     }
   }
+
+  // 当 progressRef 被销毁时，清除进度更新器
+  if (!newRef && oldRef) {
+    setProgressUpdater(null as any)
+    console.log('[WorkspaceView] progressRef destroyed, progressUpdater cleared')
+  }
+}, { immediate: true })
+
+// 使用 nextTick 确保 progressRef 被正确设置后再启动分析
+onMounted(() => {
+  nextTick(() => {
+    console.log('[WorkspaceView] onMounted + nextTick, progressRef:', !!progressRef.value, 'isAnalyzing:', isAnalyzing.value)
+    // progressRef 的 watch 会在它变为可用时设置 progressUpdater，所以这里不需要额外处理
+  })
 })
 
 // 监听日志变化，触发自动滚动
@@ -170,34 +248,25 @@ const routeProjectId = computed(() => route.params.projectId as string | undefin
 watch(
   () => routeProjectId.value,
   (projectId) => {
+    console.log('[WorkspaceView] routeProjectId changed:', projectId, 'currentProject:', currentProject.value?.id)
     if (projectId) {
-      // 有项目ID，设置当前项目
+      // 有项目ID，设置当前项目（从项目详情页进入）
       const project = projects.value.find(p => p.id === projectId)
+      console.log('[WorkspaceView] Found project:', project?.id, 'is same as current?', project === currentProject.value)
       if (project && project !== currentProject.value) {
+        console.log('[WorkspaceView] Setting currentProject:', projectId)
         projectStore.setCurrentProject(projectId)
+      } else {
+        console.log('[WorkspaceView] Not setting currentProject - already set or not found')
       }
     } else {
-      // 无项目ID，清除当前项目
-      if (currentProject.value) {
-        projectStore.currentProject = null
-      }
+      console.log('[WorkspaceView] No projectId, keeping currentProject as is')
     }
+    // 无项目ID时，不清除当前项目（新建项目进入工作台的情况）
+    // currentProject 已在 InputView 中设置，此处保持不变
   },
   { immediate: true }
 )
-
-// 检查是否需要恢复步骤状态（断点续传）
-const checkAndRestoreProgress = () => {
-  if (currentProject.value?.analysisState && progressRef.value) {
-    const currentStepIndex = currentProject.value.analysisState.currentStepIndex || 0
-    console.log('[WorkspaceView] checkAndRestoreProgress - currentStepIndex:', currentStepIndex)
-    // 如果有未完成的步骤（currentStepIndex < 5），初始化步骤状态
-    // currentStepIndex = 0 表示第一步正在进行中，也需要恢复
-    if (currentStepIndex < 5) {
-      progressRef.value.initFromStep(currentStepIndex)
-    }
-  }
-}
 
 // 是否有活跃项目（必须同时有分析数据和当前项目）
 const hasActiveProject = computed(() => {
@@ -245,18 +314,10 @@ onMounted(() => {
     }
   })
 
-  // 如果已经在分析中，立即激活第一步
-  if (isAnalyzing.value && progressRef.value) {
-    progressRef.value.startAnalysis()
-  }
-
   // 如果进入工作台但没有当前项目，清除可能存在的旧数据
   if (!currentProject.value && (originalIdea.value || logs.value.length > 0)) {
     analysisStore.reset()
   }
-
-  // 检查是否需要恢复步骤状态（断点续传）
-  checkAndRestoreProgress()
 })
 
 // 监听路由变化
@@ -279,19 +340,6 @@ watch(
           analysisStore.reset()
         }
       }
-    }
-  }
-)
-
-// 监听当前项目变化（用于断点续传时恢复进度状态）
-watch(
-  () => currentProject.value,
-  (newProject) => {
-    if (newProject && route.name === 'workspace') {
-      // 延迟执行，确保 progressRef 已经挂载
-      setTimeout(() => {
-        checkAndRestoreProgress()
-      }, 100)
     }
   }
 )
@@ -328,9 +376,9 @@ const handleSelectProject = (project: Project) => {
   router.push({ name: 'workspace', params: { projectId: project.id } })
 }
 
-// 导航到新建项目（通过侧边栏按钮）
+// 导航到新建项目（通过侧边栏按钮或工作台空状态页）
 const handleCreateNew = () => {
-  // 通知 MainLayout 打开新建项目弹窗
+  // 触发 MainLayout 打开新建项目弹窗
   window.dispatchEvent(new CustomEvent('open-new-project-modal'))
 }
 
