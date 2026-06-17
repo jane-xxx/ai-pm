@@ -39,7 +39,7 @@ export async function mockAnalyzeAnalysis(
   },
   options: { startFromStep?: number } = {}
 ) {
-  const { onLog, onProgress, onComplete, onQuestion, onResult, onStepComplete } = callbacks
+  const { onLog, onProgress, onComplete, onQuestion: _onQuestion, onResult: _onResult, onStepComplete } = callbacks
   const { startFromStep = 0 } = options
 
   try {
@@ -94,7 +94,7 @@ async function executeInfoCollection(
   analysisId: string,
   callbacks: any
 ) {
-  const { onLog, onProgress, onQuestion, onResult } = callbacks
+  const { onLog, onProgress, onQuestion } = callbacks
 
   onLog('信息采集阶段：准备分析产品需求、目标用户和竞品情况...', 'loading')
   await sleep(800)

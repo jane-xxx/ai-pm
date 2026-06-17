@@ -10,7 +10,6 @@ let questionResolver: ((value: { answer: string | string[], skipped: boolean }) 
 let progressUpdater: ((stepId: string, status: 'active' | 'completed', description?: string) => void) | null = null
 let isAnalysisStarted = false // 防止重复启动
 let pendingStartStep: number | null = null // 待执行的起始步骤（不会被自动清除）
-let checkAndStartCallCount = 0 // 防止 checkAndStart 被多次调用
 
 // 导出函数供外部调用
 export function resetAnalysisStartedFlag() {

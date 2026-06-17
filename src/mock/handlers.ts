@@ -186,7 +186,7 @@ export function setupMockMiddleware() {
 
         // POST /api/analysis/answer
         if (url === '/api/analysis/answer' && method === 'POST') {
-          const body = await getRequestBody<SubmitAnswerRequest>(req)
+          await getRequestBody<SubmitAnswerRequest>(req)
 
           res.statusCode = 200
           res.setHeader('Content-Type', 'application/json')

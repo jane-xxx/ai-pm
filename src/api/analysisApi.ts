@@ -19,7 +19,7 @@ export class AnalysisApi {
       '/analysis/start',
       params
     )
-    return res.data
+    return res.data.data
   }
 
   /**
@@ -30,7 +30,7 @@ export class AnalysisApi {
       '/analysis/results',
       { params }
     )
-    return res.data
+    return res.data.data
   }
 
   /**
@@ -41,7 +41,7 @@ export class AnalysisApi {
       '/analysis/questions',
       { params }
     )
-    return res.data
+    return res.data.data
   }
 
   /**

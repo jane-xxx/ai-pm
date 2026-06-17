@@ -1,7 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import type { Ref } from 'vue'
-import { AnalysisState, LogType, type LogEntry, type ClarifyingQuestion, type ResultItem, type AnalysisResult } from '@/types'
+import { AnalysisState, LogType, type LogEntry, type ClarifyingQuestion, type ResultItem } from '@/types'
 
 export const useAnalysisStore = defineStore('analysis', () => {
   // 状态
@@ -23,7 +22,7 @@ export const useAnalysisStore = defineStore('analysis', () => {
   // 添加日志
   const addLog = (message: string, type: LogType = LogType.INFO) => {
     const log: LogEntry = {
-      id: `log-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      id: `log-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`,
       type,
       message,
       timestamp: Date.now()
