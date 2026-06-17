@@ -118,6 +118,7 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useAnalysisStore } from '@/stores/analysis'
+import { useProjectStore } from '@/stores/project'
 import { useMockAnalysis, submitAnswer, setProgressUpdater } from '@/composables/useMockAnalysis'
 import AnalysisProgress from './AnalysisProgress.vue'
 import ClarifyingQuestionCard from './ClarifyingQuestionCard.vue'
@@ -130,6 +131,7 @@ interface Project {
 }
 
 const analysisStore = useAnalysisStore()
+const projectStore = useProjectStore()
 const { logs, currentQuestion, originalIdea } = storeToRefs(analysisStore)
 
 // 项目管理
@@ -182,6 +184,16 @@ useMockAnalysis()
 const handleAnswer = (answer: string | string[], skipped: boolean) => {
   analysisStore.answerQuestion(answer, skipped)
   submitAnswer(answer, skipped)
+
+  // 回答问题后立即保存状态（用于断点续传）
+  const currentProject = projectStore.currentProject
+  if (currentProject) {
+    projectStore.saveAnalysisState(
+      currentProject.id,
+      analysisStore,
+      0 // 信息采集阶段的步骤索引
+    )
+  }
 }
 
 // 切换项目
@@ -189,7 +201,6 @@ const handleProjectChange = () => {
   const project = currentProject.value
   if (project) {
     // 这里可以加载该项目的历史分析结果
-    console.log('切换到项目:', project.name)
   }
 }
 

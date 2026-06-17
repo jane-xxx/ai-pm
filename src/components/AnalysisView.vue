@@ -113,10 +113,11 @@
             <!-- 完成后的操作 -->
             <div v-if="isCompleted" class="result-actions">
               <button class="btn btn-secondary" @click="handleRestart">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="M1 4V10H7"/>
-                  <path d="M23 20V14H17"/>
-                  <path d="M20.49 9C20.1561 7.66357 19.4879 6.43121 18.5416 5.41104C17.5953 4.39087 16.3982 3.61499 15.0655 3.15751C13.7329 2.70002 12.3074 2.57511 10.9128 2.79412C9.51824 3.01314 8.19764 3.56905 7.06687 4.4102C5.9361 5.25135 5.03106 6.35125 4.43191 7.60821C3.83275 8.86518 3.55883 10.2429 3.63551 11.6243C3.71219 13.0057 4.13684 14.3478 4.87139 15.5294C5.60594 16.7109 6.62757 17.6956 7.84533 18.4062C9.0631 19.1168 10.4337 19.5295 11.8394 19.6054C13.2451 19.6813 14.6532 19.4182 15.9414 18.8445L20.49 20.49"/>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M21 2v6h-6"></path>
+                  <path d="M3 12a9 9 0 0 1 15-6.7L21 8"></path>
+                  <path d="M3 22v-6h6"></path>
+                  <path d="M21 12a9 9 0 0 1-15 6.7L3 16"></path>
                 </svg>
                 重新分析
               </button>
@@ -140,11 +141,13 @@
 import { ref, onMounted } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useAnalysisStore } from '@/stores/analysis'
+import { useProjectStore } from '@/stores/project'
 import { useMockAnalysis, submitAnswer, setProgressUpdater } from '@/composables/useMockAnalysis'
 import AnalysisProgress from './AnalysisProgress.vue'
 import ClarifyingQuestionCard from './ClarifyingQuestionCard.vue'
 
 const analysisStore = useAnalysisStore()
+const projectStore = useProjectStore()
 const { logs, results, currentQuestion, isAnalyzing, isPaused, isCompleted } = storeToRefs(analysisStore)
 
 // 分析进度组件引用
@@ -179,6 +182,15 @@ useMockAnalysis()
 const handleAnswer = (answer: string | string[], skipped: boolean) => {
   analysisStore.answerQuestion(answer, skipped)
   submitAnswer(answer, skipped)
+
+  // 回答问题后立即保存状态（用于断点续传）
+  if (projectStore.currentProject) {
+    projectStore.saveAnalysisState(
+      projectStore.currentProject.id,
+      analysisStore,
+      0 // 信息采集阶段的步骤索引
+    )
+  }
 }
 
 const handleRestart = () => {

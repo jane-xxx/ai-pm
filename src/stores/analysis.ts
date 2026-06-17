@@ -12,6 +12,7 @@ export const useAnalysisStore = defineStore('analysis', () => {
   const currentQuestion = ref<ClarifyingQuestion | null>(null)
   const questionHistory = ref<ClarifyingQuestion[]>([])
   const userResponses = ref<Map<string, string | string[]>>(new Map())
+  const activeStep = ref<string | null>(null)
 
   // 计算属性
   const isInput = computed(() => currentState.value === AnalysisState.INPUT)
@@ -109,6 +110,11 @@ export const useAnalysisStore = defineStore('analysis', () => {
     updateLastLog(LogType.SUCCESS, '分析完成！')
   }
 
+  // 设置当前执行步骤
+  const setActiveStep = (stepId: string | null) => {
+    activeStep.value = stepId
+  }
+
   // 重置
   const reset = () => {
     currentState.value = AnalysisState.INPUT
@@ -134,6 +140,7 @@ export const useAnalysisStore = defineStore('analysis', () => {
     currentQuestion,
     questionHistory,
     userResponses,
+    activeStep,
     // 计算属性
     isInput,
     isAnalyzing,
@@ -147,6 +154,7 @@ export const useAnalysisStore = defineStore('analysis', () => {
     addResult,
     startAnalysis,
     completeAnalysis,
+    setActiveStep,
     reset
   }
 })

@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
+import { generateProjectName } from '@/utils/keywordExtractor'
 
 export interface Project {
   id: string
@@ -19,6 +20,7 @@ export interface Project {
     questionHistory: any[]
     userResponses: any
     currentStepIndex?: number  // 下一步要执行的步骤索引
+    activeTab?: string  // 当前选中的结果tab
   }
 }
 
@@ -69,13 +71,10 @@ export const useProjectStore = defineStore('project', () => {
   const currentProject = ref<Project | null>(null)
 
   // 创建项目
-  const createProject = (data: { description: string }) => {
+  const createProject = (data: { description: string; exampleTitle?: string }) => {
     const now = Date.now()
-    // 从描述中提取简短名称，或使用默认名称
-    const shortDesc = data.description.slice(0, 20)
-    const name = shortDesc.length < data.description.length
-      ? shortDesc + '...'
-      : shortDesc || '未命名项目'
+    // 如果提供了示例标题，使用它；否则使用关键字提取
+    const name = data.exampleTitle ? data.exampleTitle + '项目' : generateProjectName(data.description)
 
     const newProject: Project = {
       id: String(now),
@@ -94,7 +93,10 @@ export const useProjectStore = defineStore('project', () => {
   const setCurrentProject = (projectId: string) => {
     const project = projects.value.find(p => p.id === projectId)
     if (project) {
+      // 确保从 projects 数组中获取最新的项目数据（包括 analysisState）
       currentProject.value = project
+    } else {
+      console.error('[ProjectStore] Project not found:', projectId)
     }
   }
 
@@ -104,6 +106,8 @@ export const useProjectStore = defineStore('project', () => {
     if (project) {
       project.status = status
       project.updatedAt = Date.now()
+    } else {
+      console.error('[ProjectStore] Project not found for status update:', projectId)
     }
   }
 
@@ -130,6 +134,8 @@ export const useProjectStore = defineStore('project', () => {
       // 安全地获取 ref 的值（如果存在）
       const getValue = (ref: any) => ref && typeof ref === 'object' && 'value' in ref ? ref.value : ref
 
+      const userResponsesValue = getValue(analysisState.userResponses)
+
       project.analysisState = {
         currentState: getValue(analysisState.currentState),
         originalIdea: getValue(analysisState.originalIdea),
@@ -137,16 +143,13 @@ export const useProjectStore = defineStore('project', () => {
         results: getValue(analysisState.results),
         currentQuestion: getValue(analysisState.currentQuestion),
         questionHistory: getValue(analysisState.questionHistory),
-        userResponses: Array.from(getValue(analysisState.userResponses) || []),
-        currentStepIndex // 记录当前进行到第几步
+        userResponses: Array.from(userResponsesValue || []),
+        currentStepIndex, // 记录当前进行到第几步
+        activeTab: getValue(analysisState.activeTab) // 记录当前选中的结果tab
       }
       project.updatedAt = Date.now()
-      console.log('[ProjectStore] Saved analysisState for project', projectId, ':', {
-        currentState: project.analysisState.currentState,
-        currentStepIndex: project.analysisState.currentStepIndex,
-        resultsCount: project.analysisState.results?.length || 0,
-        logsCount: project.analysisState.logs?.length || 0
-      })
+    } else {
+      console.error('[ProjectStore] Project not found for id:', projectId)
     }
   }
 

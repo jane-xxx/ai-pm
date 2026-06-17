@@ -67,8 +67,8 @@ const handleProjectCreated = (data: { description: string }) => {
   const newProject = projectStore.createProject(data)
   // 在 analysisStore 中启动分析
   analysisStore.startAnalysis(data.description)
-  // 切换到工作台视图（新建项目不传递项目ID）
-  router.push({ name: 'workspace' })
+  // 切换到工作台视图，传递项目ID以便刷新后恢复
+  router.push({ name: 'workspace', params: { projectId: newProject.id } })
   showNewProjectModal.value = false
 }
 
@@ -88,19 +88,23 @@ watch(
     if (newState === 'completed' && projectStore.currentProject) {
       const currentProject = projectStore.currentProject
 
-      // 更新项目状态为已完成
-      projectStore.updateProjectStatus(currentProject.id, 'completed')
+      // 更新项目状态为已完成（注意：避免重复调用，mockAnalysis 已经处理过）
+      if (currentProject.status !== 'completed') {
+        projectStore.updateProjectStatus(currentProject.id, 'completed')
+      }
 
-      // 保存分析结果到项目
-      currentProject.results = analysisStore.results.map(r => ({
-        id: r.id,
-        title: r.title,
-        content: r.content,
-        order: r.order
-      }))
+      // 保存分析结果到项目（如果没有的话）
+      if (!currentProject.results || currentProject.results.length === 0) {
+        currentProject.results = analysisStore.results.map(r => ({
+          id: r.id,
+          title: r.title,
+          content: r.content,
+          order: r.order
+        }))
+      }
 
-      // 清除分析状态（已完成无需恢复）
-      projectStore.clearAnalysisState(currentProject.id)
+      // 注意：不再清除 analysisState，保留用于刷新后恢复
+      // projectStore.clearAnalysisState(currentProject.id)  // 已移除
 
       // 更新项目时间戳
       currentProject.updatedAt = Date.now()

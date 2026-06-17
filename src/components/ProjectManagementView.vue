@@ -78,7 +78,6 @@
               {{ getStatusText(project.status) }}
             </span>
           </div>
-          <p class="card-description">{{ project.description }}</p>
           <div class="card-footer">
             <span class="card-time">{{ formatDate(project.createdAt) }}</span>
             <div class="card-actions">
@@ -124,7 +123,6 @@ const filterTabs = [
   { label: '全部', value: 'all' },
   { label: '已完成', value: 'completed' },
   { label: '分析中', value: 'analyzing' },
-  { label: '草稿', value: 'draft' }
 ]
 
 // 统计数据
@@ -362,7 +360,7 @@ const handleDelete = (project: Project) => {
   background: #F8FAFC;
   border: 1px solid #E2E8F0;
   border-radius: 12px;
-  padding: 20px;
+  padding: 16px;
   cursor: pointer;
   transition: all 0.2s ease;
 
@@ -377,7 +375,7 @@ const handleDelete = (project: Project) => {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  margin-bottom: 12px;
+  margin-bottom: 24px;
 }
 
 .card-header h3 {
@@ -407,17 +405,6 @@ const handleDelete = (project: Project) => {
     background: #F1F5F9;
     color: #64748B;
   }
-}
-
-.card-description {
-  margin: 0 0 16px;
-  font-size: 13px;
-  color: #64748B;
-  line-height: 1.6;
-  display: -webkit-box;
-  -webkit-line-clamp: 3;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
 }
 
 .card-footer {

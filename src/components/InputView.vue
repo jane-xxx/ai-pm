@@ -29,60 +29,31 @@
             @input="updateInput"
           ></textarea>
           <div class="input-footer">
-            <span class="char-count">{{ inputValue.length }} 字符</span>
             <button
-              class="btn btn-primary"
+              class="btn-analyze"
               :disabled="!inputValue.trim()"
               @click="handleStart"
             >
               <span>开始分析</span>
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
                 <path d="M6 3L11 8L6 13V3Z"/>
               </svg>
             </button>
           </div>
         </div>
-      </div>
 
-      <!-- 特性展示 -->
-      <div class="features-section">
-        <div class="feature-grid">
-          <div class="feature-item">
-            <div class="feature-icon">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <circle cx="12" cy="12" r="10"/>
-                <path d="M12 6V12L16 14"/>
-              </svg>
-            </div>
-            <div class="feature-text">
-              <span class="feature-title">智能分析</span>
-              <span class="feature-desc">AI 自动分析产品想法</span>
-            </div>
-          </div>
-          <div class="feature-item">
-            <div class="feature-icon">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M21 16V8C21 6.89543 20.1046 6 19 6H5C3.89543 6 3 6.89543 3 8V16C3 17.1046 3.89543 18 5 18H19C20.1046 18 21 17.1046 21 16Z"/>
-                <circle cx="12" cy="12" r="3"/>
-              </svg>
-            </div>
-            <div class="feature-text">
-              <span class="feature-title">深度洞察</span>
-              <span class="feature-desc">多维度产品分析</span>
-            </div>
-          </div>
-          <div class="feature-item">
-            <div class="feature-icon">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M12 22C17.5228 22 22 17.5228 22 12C22 6.47715 17.5228 2 12 2C6.47715 2 2 6.47715 2 12C2 17.5228 6.47715 22 12 22Z"/>
-                <path d="M8 12H16"/>
-                <path d="M12 8V16"/>
-              </svg>
-            </div>
-            <div class="feature-text">
-              <span class="feature-title">交互式</span>
-              <span class="feature-desc">智能提问精准分析</span>
-            </div>
+        <!-- 示例选择 -->
+        <div class="examples-section">
+          <p class="examples-label">选择示例</p>
+          <div class="examples-grid">
+            <button
+              v-for="example in examples"
+              :key="example.id"
+              class="example-item"
+              @click="selectExample(example.text, example.title)"
+            >
+              {{ example.title }}
+            </button>
           </div>
         </div>
       </div>
@@ -100,21 +71,37 @@ const router = useRouter()
 const analysisStore = useAnalysisStore()
 const projectStore = useProjectStore()
 const inputValue = ref('')
+const selectedExampleTitle = ref('')
+
+const examples = [
+  { id: 1, title: '设计师协作工具', text: '我想做一个帮助设计师管理设计稿的工具，支持版本控制、团队协作和设计评审功能，主要面向中小型设计团队。' },
+  { id: 2, title: '习惯养成APP', text: '开发一款习惯养成类APP，通过游戏化机制帮助用户建立和坚持好习惯，包含打卡、好友PK、成就系统等功能。' },
+  { id: 3, title: '自由工作平台', text: '打造一个连接自由职业者和客户的平台，提供项目匹配、合同管理、支付托管等一站式服务，专注于创意行业。' },
+  { id: 4, title: '智能健身助手', text: '基于AI的智能健身应用，根据用户身体数据、运动习惯和目标，自动生成个性化训练计划，并通过动作识别提供实时反馈。' }
+]
 
 const updateInput = () => {
-  // 可以在这里添加输入验证
+  selectedExampleTitle.value = ''
+}
+
+const selectExample = (text: string, title: string) => {
+  inputValue.value = text
+  selectedExampleTitle.value = title
+}
+
+const goToProjects = () => {
+  router.push({ name: 'projects' })
 }
 
 const handleStart = () => {
   if (inputValue.value.trim()) {
-    // 先创建项目
-    const newProject = projectStore.createProject({ description: inputValue.value })
-    // 设置为当前项目
+    const newProject = projectStore.createProject({
+      description: inputValue.value,
+      exampleTitle: selectedExampleTitle.value
+    })
     projectStore.setCurrentProject(newProject.id)
-    // 启动分析
     analysisStore.startAnalysis(inputValue.value)
-    // 导航到工作台（新建项目不需要传递项目ID）
-    router.push({ name: 'workspace' })
+    router.push({ name: 'workspace', params: { projectId: newProject.id } })
   }
 }
 </script>
@@ -172,16 +159,17 @@ const handleStart = () => {
 
 .input-section {
   margin-bottom: 48px;
+  animation: fadeIn 0.6s ease 0.1s backwards;
 }
 
 .input-card {
   background: white;
   border-radius: 20px;
-  padding: 32px;
+  padding: 20px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05),
               0 20px 40px rgba(124, 58, 237, 0.08);
   border: 1px solid #F1F5F9;
-  animation: fadeIn 0.6s ease 0.1s backwards;
+  margin-bottom: 24px;
 }
 
 .input-header {
@@ -203,13 +191,13 @@ const handleStart = () => {
 
 .idea-input {
   width: 100%;
-  min-height: 180px;
+  height: 140px;
   padding: 16px;
   border: 1px solid #E2E8F0;
   border-radius: 12px;
   font-size: 15px;
   line-height: 1.7;
-  resize: vertical;
+  resize: none;
   outline: none;
   transition: all 0.2s ease;
   font-family: inherit;
@@ -226,30 +214,23 @@ const handleStart = () => {
 
 .input-footer {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
+  justify-content: flex-end;
   margin-top: 16px;
-  padding-top: 16px;
-  border-top: 1px solid #F1F5F9;
 }
 
-.char-count {
-  font-size: 13px;
-  color: #94A3B8;
-}
-
-.btn {
+.btn-analyze {
   display: inline-flex;
   align-items: center;
   gap: 8px;
   padding: 12px 24px;
+  background: linear-gradient(135deg, #7C3AED, #4F46E5);
+  color: white;
+  border: none;
   border-radius: 12px;
   font-size: 15px;
   font-weight: 500;
   cursor: pointer;
   transition: all 0.2s ease;
-  border: none;
-  outline: none;
 
   svg {
     transition: transform 0.2s ease;
@@ -268,71 +249,44 @@ const handleStart = () => {
     transform: translateY(0);
   }
 
-  &.btn-primary {
-    background: linear-gradient(135deg, #7C3AED, #4F46E5);
-    color: white;
-
-    &:disabled {
-      opacity: 0.5;
-      cursor: not-allowed;
-    }
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
   }
 }
 
-.features-section {
+.examples-section {
   animation: fadeIn 0.6s ease 0.2s backwards;
 }
 
-.feature-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 20px;
+.examples-label {
+  font-size: 14px;
+  color: #64748B;
+  margin-bottom: 12px;
 }
 
-.feature-item {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 16px;
+.examples-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+}
+
+.example-item {
+  padding: 12px 16px;
   background: white;
-  border-radius: 12px;
   border: 1px solid #F1F5F9;
+  border-radius: 12px;
+  font-size: 13px;
+  color: #475569;
+  cursor: pointer;
   transition: all 0.2s ease;
+  text-align: center;
 
   &:hover {
-    border-color: #E2E8F0;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
-    transform: translateY(-2px);
+    border-color: #A78BFA;
+    color: #7C3AED;
+    box-shadow: 0 2px 8px rgba(124, 58, 237, 0.1);
   }
-}
-
-.feature-icon {
-  width: 40px;
-  height: 40px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: linear-gradient(135deg, #F5F3FF, #EDE9FE);
-  border-radius: 10px;
-  color: #7C3AED;
-  flex-shrink: 0;
-}
-
-.feature-text {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.feature-title {
-  font-size: 14px;
-  font-weight: 600;
-  color: #1E293B;
-}
-
-.feature-desc {
-  font-size: 13px;
-  color: #64748B;
 }
 
 @keyframes fadeIn {
@@ -346,7 +300,6 @@ const handleStart = () => {
   }
 }
 
-// 响应式
 @media (max-width: 768px) {
   .title {
     font-size: 32px;
@@ -357,15 +310,11 @@ const handleStart = () => {
   }
 
   .input-card {
-    padding: 24px;
+    padding: 20px;
   }
 
-  .feature-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .feature-item {
-    padding: 12px;
+  .examples-grid {
+    grid-template-columns: repeat(2, 1fr);
   }
 }
 </style>

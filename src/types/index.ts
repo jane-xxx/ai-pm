@@ -40,6 +40,7 @@ export interface ResultItem {
   title: string
   content: string
   order: number
+  isStreaming?: boolean // 是否启用流式输出效果
 }
 
 // 完整分析结果

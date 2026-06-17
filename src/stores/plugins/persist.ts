@@ -14,7 +14,25 @@ export const persistPlugin = ({ store }: PiniaPluginContext) => {
   const saved = localStorage.getItem(`pinia-${store.$id}`)
   if (saved) {
     try {
-      store.$patch(JSON.parse(saved))
+      const parsed = JSON.parse(saved)
+
+      // 对于 project store，特殊处理 currentProject
+      if (store.$id === 'project') {
+        const currentProjectId = parsed.currentProject?.id
+
+        // 只恢复 projects 数组，不恢复 currentProject 对象
+        store.$patch({ projects: parsed.projects })
+
+        // 如果有 currentProjectId，从 projects 数组中找到并设置
+        if (currentProjectId) {
+          const project = parsed.projects.find((p: any) => p.id === currentProjectId)
+          if (project) {
+            store.currentProject = project
+          }
+        }
+      } else {
+        store.$patch(parsed)
+      }
     } catch (e) {
       console.error(`Failed to restore ${store.$id}:`, e)
     }

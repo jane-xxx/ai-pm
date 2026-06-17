@@ -146,100 +146,38 @@ watch(logListRef, (element) => {
   }
 })
 
-// 记录上次的 analysisState，用于检测变化
-let lastAnalysisState: any = null
-
-// 监听 progressRef 和 currentProject 的 analysisState，处理进度恢复
-watch([progressRef, () => currentProject.value?.analysisState], ([ref, analysisState], [oldRef, oldAnalysisState]) => {
-  console.log('[WorkspaceView] Progress watch triggered:', {
-    hasRef: !!ref,
-    hasAnalysisState: !!analysisState,
-    hadOldAnalysisState: !!oldAnalysisState,
-    isAnalyzing: isAnalyzing.value,
-    stepIndex: analysisState?.currentStepIndex,
-    currentProjectId: currentProject.value?.id,
-    currentState: analysisStore.currentState
-  })
-
-  if (ref) {
-    // 只在断点续传场景下恢复步骤状态
-    // 条件：有 analysisState，之前没有（刚从项目详情页进入），且不是全新分析
-    if (analysisState && !oldAnalysisState) {
-      // 检查是否是断点续传（有结果或问题历史）
-      const isResume = analysisState.results && analysisState.results.length > 0
-      const currentStepIndex = analysisState.currentStepIndex || 0
-
-      if (isResume) {
-        // 断点续传：恢复步骤状态
-        console.log('[WorkspaceView] Restoring steps from breakpoint (resume scenario), currentStepIndex:', currentStepIndex)
-        // initFromStep 会自动处理边界情况：
-        // - currentStepIndex < 3: 恢复到对应步骤
-        // - currentStepIndex >= 3: 标记所有步骤为完成（分析已完成）
-        ref.initFromStep(currentStepIndex)
-      } else {
-        // 全新分析：让主循环控制步骤状态，不调用 initFromStep
-        console.log('[WorkspaceView] Fresh analysis detected, skipping initFromStep to let main loop control')
-      }
-    } else if (!analysisState && isAnalyzing.value) {
-      // 全新分析：不激活任何步骤，让主循环控制
-      console.log('[WorkspaceView] Fresh analysis - step activation controlled by main loop')
-    } else {
-      console.log('[WorkspaceView] Skipping step restoration - conditions not met', {
-        analysisState: !!analysisState,
-        oldAnalysisState: !!oldAnalysisState,
-        isAnalyzing: isAnalyzing.value
-      })
-    }
-
-    // 更新记录
-    lastAnalysisState = analysisState
-  }
-}, { immediate: true })
-
-// 单独监听 progressRef 变化（处理组件稍后挂载的情况）
+// 监听 progressRef 变化（处理组件稍后挂载的情况）
 watch(progressRef, (newRef, oldRef) => {
-  console.log('[WorkspaceView] progressRef watch triggered:', { newRef: !!newRef, oldRef: !!oldRef, isAnalyzing: isAnalyzing.value })
-
   // 当 progressRef 从 null 变为有值时
   if (newRef && !oldRef) {
     // 设置进度更新器，让 mockAnalysis 能够更新步骤状态
     setProgressUpdater((stepId: string, status: 'active' | 'completed', description?: string) => {
-      console.log('[WorkspaceView] progressUpdater callback called:', stepId, status)
       newRef.updateStep(stepId, status, description)
     })
-    console.log('[WorkspaceView] progressRef became available, progressUpdater set')
 
-    // 如果当前有 analysisState，恢复步骤状态
-    if (currentProject.value?.analysisState && isAnalyzing.value) {
+    // 如果当前有 analysisState，恢复步骤状态（不管是否正在分析）
+    if (currentProject.value?.analysisState) {
       const analysisState = currentProject.value.analysisState
 
-      // 根据结果数量计算正确的步骤索引（更可靠）
-      // 每个步骤产生3个结果，所以结果数量 / 3 = 已完成步骤数
-      const resultsCount = analysisState.results?.length || 0
-      const completedSteps = Math.floor(resultsCount / 3)
+      // 如果分析已完成，直接标记所有步骤为完成
+      if (analysisState.currentState === 'completed') {
+        newRef.initFromStep(3) // 3 表示超出范围，所有步骤都会标记为完成
+      } else {
+        // 根据结果数量计算正确的步骤索引
+        // 每个步骤产生3个结果（PRD生成除外），所以结果数量 / 3 = 已完成步骤数
+        const resultsCount = analysisState.results?.length || 0
+        const completedSteps = Math.floor(resultsCount / 3)
 
-      console.log('[WorkspaceView] Restoring steps from index:', completedSteps, '(based on', resultsCount, 'results)')
-      newRef.initFromStep(completedSteps)
+        newRef.initFromStep(completedSteps)
+      }
     }
   }
 
   // 当 progressRef 被销毁时，清除进度更新器
   if (!newRef && oldRef) {
     setProgressUpdater(null as any)
-    console.log('[WorkspaceView] progressRef destroyed, progressUpdater cleared')
   }
 }, { immediate: true })
-
-// 使用 nextTick 确保 progressRef 被正确设置后再启动分析
-onMounted(() => {
-  nextTick(() => {
-    console.log('[WorkspaceView] onMounted + nextTick, progressRef:', !!progressRef.value, 'isAnalyzing:', isAnalyzing.value)
-    // progressRef 的 watch 会在它变为可用时设置 progressUpdater，所以这里不需要额外处理
-  })
-})
-
-// 监听日志变化，触发自动滚动
-watch(logs, onLogContentChange, { deep: true })
 
 // 从路由参数获取项目ID
 const routeProjectId = computed(() => route.params.projectId as string | undefined)
@@ -248,24 +186,69 @@ const routeProjectId = computed(() => route.params.projectId as string | undefin
 watch(
   () => routeProjectId.value,
   (projectId) => {
-    console.log('[WorkspaceView] routeProjectId changed:', projectId, 'currentProject:', currentProject.value?.id)
     if (projectId) {
       // 有项目ID，设置当前项目（从项目详情页进入）
       const project = projects.value.find(p => p.id === projectId)
-      console.log('[WorkspaceView] Found project:', project?.id, 'is same as current?', project === currentProject.value)
       if (project && project !== currentProject.value) {
-        console.log('[WorkspaceView] Setting currentProject:', projectId)
         projectStore.setCurrentProject(projectId)
-      } else {
-        console.log('[WorkspaceView] Not setting currentProject - already set or not found')
       }
-    } else {
-      console.log('[WorkspaceView] No projectId, keeping currentProject as is')
     }
-    // 无项目ID时，不清除当前项目（新建项目进入工作台的情况）
-    // currentProject 已在 InputView 中设置，此处保持不变
   },
   { immediate: true }
+)
+
+// 页面刷新时恢复分析状态
+watch(
+  () => currentProject.value,
+  (project) => {
+    if (!project) {
+      return
+    }
+
+    // 检查是否有保存的分析状态
+    const analysisState = project.analysisState
+    if (!analysisState) {
+      return
+    }
+
+    // 检查是否需要恢复（analysis store 为空说明是刷新后的初始状态）
+    const needsRestore =
+      !isAnalyzing.value &&
+      !originalIdea.value &&
+      logs.value.length === 0 &&
+      analysisStore.results.length === 0
+
+    if (needsRestore) {
+      // 恢复分析状态到 analysis store
+      analysisStore.currentState = analysisState.currentState
+      originalIdea.value = analysisState.originalIdea || ''
+      logs.value = analysisState.logs || []
+      analysisStore.results = analysisState.results || []
+      currentQuestion.value = analysisState.currentQuestion || null
+      analysisStore.questionHistory = analysisState.questionHistory || []
+
+      // 恢复 userResponses（从数组转换为 Map）
+      if (Array.isArray(analysisState.userResponses)) {
+        analysisStore.userResponses = new Map(analysisState.userResponses)
+      }
+
+      // 恢复 activeTab
+      if (analysisState.activeTab) {
+        analysisStore.activeTab = analysisState.activeTab
+      }
+    }
+  },
+  { immediate: true }
+)
+
+// 监听 activeTab 变化，保存状态
+watch(
+  () => analysisStore.activeTab,
+  (newTab) => {
+    if (newTab && currentProject.value) {
+      projectStore.saveAnalysisState(currentProject.value.id, analysisStore)
+    }
+  }
 )
 
 // 是否有活跃项目（必须同时有分析数据和当前项目）
@@ -276,21 +259,6 @@ const hasActiveProject = computed(() => {
   return isAnalyzing.value || originalIdea.value || logs.value.length > 0
 })
 
-// 最近项目
-const recentProjects = computed(() => {
-  return projects.value.slice(0, 3)
-})
-
-// 获取状态文本
-const getStatusText = (status: Project['status']) => {
-  const statusMap = {
-    analyzing: '分析中',
-    completed: '已完成',
-    draft: '草稿'
-  }
-  return statusMap[status] || status
-}
-
 // 格式化时间
 const formatTime = (timestamp: number) => {
   const date = new Date(timestamp)
@@ -298,12 +266,6 @@ const formatTime = (timestamp: number) => {
   const minutes = String(date.getMinutes()).padStart(2, '0')
   const seconds = String(date.getSeconds()).padStart(2, '0')
   return `${hours}:${minutes}:${seconds}`
-}
-
-// 格式化日期
-const formatDate = (timestamp: number) => {
-  const date = new Date(timestamp)
-  return `${date.getMonth() + 1}月${date.getDate()}日`
 }
 
 // 设置进度更新器并检查初始状态
@@ -319,6 +281,9 @@ onMounted(() => {
     analysisStore.reset()
   }
 })
+
+// 监听日志变化，触发自动滚动
+watch(logs, onLogContentChange, { deep: true })
 
 // 监听路由变化
 watch(
@@ -368,6 +333,15 @@ onBeforeUnmount(() => {
 const handleAnswer = (answer: string | string[], skipped: boolean) => {
   analysisStore.answerQuestion(answer, skipped)
   submitAnswer(answer, skipped)
+
+  // 回答问题后立即保存状态（用于断点续传）
+  if (currentProject.value) {
+    projectStore.saveAnalysisState(
+      currentProject.value.id,
+      analysisStore,
+      0 // 信息采集阶段的步骤索引
+    )
+  }
 }
 
 // 选择项目
@@ -399,51 +373,10 @@ const handleClearAnalysis = () => {
 // === 工作台内容 ===
 .workspace-content {
   display: grid;
-//   grid-template-rows: auto 1fr;
   grid-template-columns: 400px 1fr;
   gap: 16px;
   padding: 18px;
   height: 100vh;
-}
-
-.workspace-toolbar {
-  grid-column: 1 / -1;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 12px 16px;
-  background: white;
-  border-radius: 10px;
-  border: 1px solid #E2E8F0;
-}
-
-.toolbar-title {
-  font-size: 14px;
-  font-weight: 500;
-  color: #1E293B;
-  max-width: 400px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.toolbar-btn {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 8px 12px;
-  background: #FEE2E2;
-  color: #DC2626;
-  border: none;
-  border-radius: 8px;
-  font-size: 13px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s ease;
-
-  &:hover {
-    background: #FECACA;
-  }
 }
 
 .left-panel {

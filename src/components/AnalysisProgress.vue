@@ -91,15 +91,12 @@ const completedCount = computed(() =>
 const updateStep = (id: string, status: 'pending' | 'active' | 'completed') => {
   const timestamp = new Date().toISOString().split('T')[1].slice(0, -1)
   const beforeState = steps.value.map(s => ({ id: s.id, status: s.status }))
-  console.log(`[AnalysisProgress ${timestamp}] updateStep START:`, { id, status, beforeState })
 
   // 特殊处理重置信号
   if (id === '__reset__') {
-    console.log('[AnalysisProgress] Reset signal received, resetting all steps to pending')
     reset()
     // 重要：重置后等待 Vue 更新完成，确保 UI 渲染 'pending' 状态
     nextTick(() => {
-      console.log('[AnalysisProgress] Reset complete, UI updated to pending')
     })
     return
   }
@@ -107,29 +104,23 @@ const updateStep = (id: string, status: 'pending' | 'active' | 'completed') => {
   const stepIndex = steps.value.findIndex(s => s.id === id)
   if (stepIndex === -1) {
     // 子步骤ID（如 requirement, user-research 等），不处理
-    console.log(`[AnalysisProgress] Skipping sub-step: ${id}`)
     return
   }
 
   const step = steps.value[stepIndex]
   const oldStatus = step.status
   step.status = status
-  console.log(`[AnalysisProgress] Step ${id} status changed: ${oldStatus} -> ${status}`)
-  console.log(`[AnalysisProgress] After update:`, steps.value.map(s => ({ id: s.id, status: s.status })))
 }
 
 // 重置所有步骤
 const reset = () => {
-  console.log('[AnalysisProgress] reset() called, setting all steps to pending')
   steps.value.forEach((s) => {
     s.status = 'pending'
   })
-  console.log('[AnalysisProgress] reset() complete, all steps:', steps.value.map(s => ({ id: s.id, status: s.status })))
 }
 
 // 启动分析（激活第一步）
 const startAnalysis = () => {
-  console.log('[AnalysisProgress] startAnalysis() called, activating first step')
   steps.value[0].status = 'active'
 }
 
@@ -137,11 +128,9 @@ const startAnalysis = () => {
 const initFromStep = (currentStepIndex: number) => {
   // currentStepIndex 是下一个要执行的步骤索引（0-based）
   // 例如 currentStepIndex = 1 表示步骤 0 已完成，步骤 1 进行中
-  console.log('[AnalysisProgress] initFromStep called with currentStepIndex:', currentStepIndex)
 
   // 边界检查：如果 currentStepIndex 超出范围，说明分析已完成
   if (currentStepIndex >= steps.value.length) {
-    console.log('[AnalysisProgress] currentStepIndex out of bounds, marking all steps as completed')
     steps.value.forEach((s) => {
       s.status = 'completed'
     })
@@ -158,7 +147,6 @@ const initFromStep = (currentStepIndex: number) => {
       s.status = 'pending'
     }
     if (oldStatus !== s.status) {
-      console.log(`  Step ${i} (${s.id}): ${oldStatus} -> ${s.status}`)
     }
   })
 }

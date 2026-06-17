@@ -9,7 +9,16 @@
     "deploy": "npm run build && git subtree push --prefix dist origin gh-pages"
   },
   "dependencies": {
+    "@types/dompurify": "^3.2.0",
+    "@types/html2pdf.js": "^0.10.0",
+    "@types/markdown-it": "^14.1.2",
+    "axios": "^1.18.0",
+    "dompurify": "^3.4.11",
+    "highlight.js": "^11.11.1",
+    "html2pdf.js": "^0.14.0",
+    "markdown-it": "^14.2.0",
     "pinia": "^2.1.0",
+    "pinia-plugin-persistedstate": "^3.2.3",
     "vue": "^3.4.0",
     "vue-router": "^4.6.4"
   },

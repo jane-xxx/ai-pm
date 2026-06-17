@@ -39,14 +39,28 @@
     <div v-else class="results-content">
       <!-- Tab 切换 -->
       <div class="results-tabs">
+        <div class="tabs-left">
+          <button
+            v-for="tab in tabs"
+            :key="tab.key"
+            class="tab-button"
+            :class="{ active: activeTab === tab.key }"
+            @click="activeTab = tab.key"
+          >
+            {{ tab.title }}
+          </button>
+        </div>
         <button
-          v-for="tab in tabs"
-          :key="tab.key"
-          class="tab-button"
-          :class="{ active: activeTab === tab.key }"
-          @click="activeTab = tab.key"
+          v-if="prdResult"
+          class="export-button"
+          @click="exportPRD"
         >
-          {{ tab.title }}
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+            <polyline points="7 10 12 15 17 10"/>
+            <line x1="12" y1="15" x2="12" y2="3"/>
+          </svg>
+          <span>导出PRD</span>
         </button>
       </div>
 
@@ -57,12 +71,16 @@
           :key="result.id"
           class="result-item fade-in"
         >
-          <div class="result-header">
-            <span class="result-order">{{ result.order }}</span>
+          <div class="result-header" v-if="result.title">
             <h4 class="result-title">{{ result.title }}</h4>
           </div>
           <div class="result-content">
-            {{ result.content }}
+            <StreamingMarkdown
+              :content="result.content"
+              :enabled="result.isStreaming ?? false"
+              :speed="5"
+              :delay="20"
+            />
           </div>
         </div>
 
@@ -85,6 +103,9 @@ import { ref, computed, watch, nextTick } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useAnalysisStore } from '@/stores/analysis'
 import { useAutoScroll } from '@/composables/useAutoScroll'
+import StreamingMarkdown from './StreamingMarkdown.vue'
+import html2pdf from 'html2pdf.js'
+import MarkdownIt from 'markdown-it'
 
 // Tab 定义
 interface Tab {
@@ -147,6 +168,72 @@ watch(resultsContentRef, (element) => {
 const showLoading = computed(() => {
   return results.value.length === 0
 })
+
+// PRD 结果（用于导出）
+const prdResult = computed(() => {
+  return results.value.find(r => r.id === 'r7')
+})
+
+// 导出 PRD 文档为 PDF
+const exportPRD = () => {
+  const prd = prdResult.value
+  if (!prd) return
+
+  // 配置 markdown-it
+  const md = new MarkdownIt({
+    html: true,
+    linkify: true,
+    typographer: true
+  })
+
+  // 创建完整的 Markdown 内容（添加标题）
+  const fullMarkdown = prd.title ? `# ${prd.title}\n\n${prd.content}` : prd.content
+
+  // 转换 Markdown 为 HTML
+  const htmlContent = md.render(fullMarkdown)
+
+  // 包装样式
+  const styledHtml = `
+    <div style="font-family: 'PingFang SC', 'Microsoft YaHei', 'Helvetica Neue', Helvetica, Arial, sans-serif; padding: 40px; line-height: 1.8; color: #1E293B;">
+      <style>
+        h1 { font-size: 24px; font-weight: 600; color: #1E293B; margin-top: 0; margin-bottom: 20px; border-bottom: 3px solid #7C3AED; padding-bottom: 12px; }
+        h2 { font-size: 20px; font-weight: 600; color: #1E293B; margin-top: 28px; margin-bottom: 14px; }
+        h3 { font-size: 18px; font-weight: 600; color: #334155; margin-top: 22px; margin-bottom: 12px; }
+        h4 { font-size: 16px; font-weight: 600; color: #475569; margin-top: 18px; margin-bottom: 10px; }
+        h5, h6 { font-size: 14px; font-weight: 600; color: #64748B; margin-top: 16px; margin-bottom: 8px; }
+        p { margin: 8px 0; font-size: 14px; }
+        ul, ol { margin: 12px 0; padding-left: 24px; }
+        li { margin: 6px 0; font-size: 14px; }
+        strong { font-weight: 600; color: #1E293B; }
+        em { font-style: italic; color: #64748B; }
+        code { background: #F3F4F6; color: #E11D48; padding: 2px 6px; border-radius: 4px; font-family: 'Monaco', 'Menlo', monospace; font-size: 13px; }
+        pre { background: #282C34; color: #ABB2BF; padding: 16px; border-radius: 8px; margin: 16px 0; overflow-x: auto; }
+        pre code { background: transparent; color: inherit; padding: 0; }
+        blockquote { margin: 16px 0; padding: 12px 16px; background: #F3F4F6; border-left: 4px solid #7C3AED; color: #64748B; }
+        blockquote p { margin: 0; }
+        hr { border: none; border-top: 2px solid #E2E8F0; margin: 24px 0; }
+        table { width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 13px; }
+        th, td { padding: 8px 12px; border: 1px solid #E2E8F0; text-align: left; }
+        th { background: #F9FAFB; font-weight: 600; color: #374151; }
+        tr:nth-child(even) { background: #F9FAFB; }
+        a { color: #7C3AED; text-decoration: none; }
+      </style>
+      ${htmlContent}
+    </div>
+  `
+
+  // PDF 配置
+  const opt = {
+    margin: [15, 15, 15, 15],
+    filename: `PRD文档_${new Date().toISOString().slice(0, 10)}.pdf`,
+    image: { type: 'jpeg', quality: 0.98 },
+    html2canvas: { scale: 2, useCORS: true, letterRendering: true },
+    jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+  }
+
+  // 生成并下载 PDF
+  html2pdf().set(opt).from(styledHtml).save()
+}
 
 // 获取指定 tab 的结果
 const getTabResults = (tabKey: string) => {
@@ -392,10 +479,17 @@ watch(results, (newResults) => {
 // === Tab 切换 ===
 .results-tabs {
   display: flex;
-  gap: 32px;
+  align-items: center;
+  justify-content: space-between;
   padding: 16px 20px 0;
   background: white;
   border-bottom: 1px solid #F1F5F9;
+  margin-bottom: 4px;
+}
+
+.tabs-left {
+  display: flex;
+  gap: 32px;
 }
 
 .tab-button {
@@ -432,14 +526,41 @@ watch(results, (newResults) => {
   }
 }
 
+.export-button {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  background: linear-gradient(135deg, #7C3AED, #4F46E5);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 8px rgba(124, 58, 237, 0.2);
+  position: relative;
+  top: -6px;
+
+  &:hover {
+    background: linear-gradient(135deg, #6D28D9, #4338CA);
+    box-shadow: 0 4px 12px rgba(124, 58, 237, 0.3);
+  }
+}
+
 // === 分析结果列表 ===
 .analysis-results {
   flex: 1;
   overflow-y: auto;
-  padding: 20px;
+  padding: 16px 20px 20px;
   display: flex;
   flex-direction: column;
   gap: 16px;
+
+  :deep(.markdown-renderer) h1:first-child {
+    margin-top: 0;
+  }
 }
 
 .result-item {
@@ -466,24 +587,7 @@ watch(results, (newResults) => {
 }
 
 .result-header {
-  display: flex;
-  align-items: center;
-  gap: 12px;
   margin-bottom: 12px;
-}
-
-.result-order {
-  width: 28px;
-  height: 28px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: linear-gradient(135deg, #7C3AED, #4F46E5);
-  color: white;
-  border-radius: 8px;
-  font-size: 13px;
-  font-weight: 600;
-  flex-shrink: 0;
 }
 
 .result-title {
@@ -495,10 +599,6 @@ watch(results, (newResults) => {
 
 .result-content {
   margin: 0;
-  font-size: 14px;
-  color: #4B5563;
-  line-height: 1.7;
-  white-space: pre-wrap;
 }
 
 // === 空状态 ===
