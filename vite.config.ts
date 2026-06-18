@@ -1,17 +1,20 @@
 import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
-import { setupMockMiddleware } from './src/mock/handlers'
+import viteCompression from 'vite-plugin-compression'
 
 export default defineConfig({
   plugins: [
     vue(),
-    {
-      name: 'vite-plugin-mock-api',
-      configureServer(server) {
-        // 在开发服务器中添加mock中间件
-        server.middlewares.use(setupMockMiddleware())
-      }
-    }
+    // Gzip 压缩
+    viteCompression({
+      algorithm: 'gzip',
+      ext: '.gz',
+    }),
+    // Brotli 压缩
+    viteCompression({
+      algorithm: 'brotliCompress',
+      ext: '.br',
+    })
   ],
   base: '/ai-pm/', // GitHub Pages base path
   server: {

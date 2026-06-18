@@ -19,7 +19,8 @@ export class AnalysisApi {
       '/analysis/start',
       params
     )
-    return res.data.data
+    // 响应拦截器已返回 response.data，所以 res.data 直接是 StartAnalysisResponse
+    return res.data as any
   }
 
   /**
@@ -30,7 +31,8 @@ export class AnalysisApi {
       '/analysis/results',
       { params }
     )
-    return res.data.data
+    // 响应拦截器已返回 response.data
+    return res.data as any
   }
 
   /**
@@ -41,7 +43,8 @@ export class AnalysisApi {
       '/analysis/questions',
       { params }
     )
-    return res.data.data
+    // 响应拦截器已返回 response.data
+    return res.data as any
   }
 
   /**

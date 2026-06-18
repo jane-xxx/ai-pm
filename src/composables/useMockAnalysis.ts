@@ -70,9 +70,8 @@ export function useMockAnalysis() {
 
         if (progressUpdater) {
           progressUpdater(stepId, status, description)
-        } else {
-          console.warn('[useMockAnalysis] progressUpdater is null, cannot update step status!')
         }
+        // 移除警告：progressUpdater 可能为 null 是正常情况（某些视图不显示进度）
       },
       onQuestion: async (question: ClarifyingQuestion) => {
         // 创建 Promise 等待用户回答
@@ -113,9 +112,8 @@ export function useMockAnalysis() {
             analysisStore,
             3 // 所有步骤完成
           )
-        } else {
-          console.error('[MockAnalysis] No currentProject when trying to save analysis state!')
         }
+        // 如果没有 currentProject，可能是从 InputView 直接开始的，无需保存
       },
       onStepComplete: (stepIndex: number) => {
         // 每步完成后，保存分析状态到项目（用于断点续传）
@@ -144,17 +142,12 @@ export function useMockAnalysis() {
       }
 
       // 等待 progressUpdater 被设置（如果还没有的话）
+      // 注意：progressUpdater 可选，没有的话分析仍可进行，只是不更新进度UI
       let waitCount = 0
       while (!progressUpdater && waitCount < 50) {
         await new Promise(resolve => setTimeout(resolve, 10))
         waitCount++
       }
-
-      if (!progressUpdater) {
-        console.error('[useMockAnalysis] progressUpdater not set after waiting, cannot start analysis!')
-        return
-      }
-
 
       // 如果是全新分析（没有结果），强制重置启动标志
       // 这处理了在工作台页面创建新项目的情况

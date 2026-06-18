@@ -67,8 +67,8 @@
       <!-- 分析结果列表 -->
       <div ref="resultsContentRef" class="analysis-results">
         <div
-          v-for="result in filteredResults"
-          :key="result.id"
+          v-for="(result, index) in filteredResults"
+          :key="`${result.id}-${index}`"
           class="result-item fade-in"
         >
           <div class="result-header" v-if="result.title">
@@ -104,7 +104,6 @@ import { storeToRefs } from 'pinia'
 import { useAnalysisStore } from '@/stores/analysis'
 import { useAutoScroll } from '@/composables/useAutoScroll'
 import StreamingMarkdown from './StreamingMarkdown.vue'
-import html2pdf from 'html2pdf.js'
 import MarkdownIt from 'markdown-it'
 
 // Tab 定义
@@ -175,9 +174,12 @@ const prdResult = computed(() => {
 })
 
 // 导出 PRD 文档为 PDF
-const exportPRD = () => {
+const exportPRD = async () => {
   const prd = prdResult.value
   if (!prd) return
+
+  // 动态导入 html2pdf
+  const html2pdf = (await import('html2pdf.js')).default
 
   // 配置 markdown-it
   const md = new MarkdownIt({

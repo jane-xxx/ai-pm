@@ -90,8 +90,8 @@
         <!-- 分析结果列表 -->
         <div class="analysis-results">
           <div
-            v-for="item in filteredResults"
-            :key="item.id"
+            v-for="(item, index) in filteredResults"
+            :key="`${item.id}-${index}`"
             class="result-item fade-in"
           >
             <div class="result-header" v-if="item.title">
@@ -109,12 +109,7 @@
 
           <!-- 空状态 -->
           <div v-if="filteredResults.length === 0" class="empty-state">
-            <div class="empty-icon">
-              <div class="pulse-dot"></div>
-              <div class="pulse-dot"></div>
-              <div class="pulse-dot"></div>
-            </div>
-            <p>该阶段的分析结果即将呈现...</p>
+            <p>该阶段暂无分析结果</p>
           </div>
         </div>
       </div>
@@ -169,7 +164,6 @@ import { useProjectStore } from '@/stores/project'
 import { useAnalysisStore } from '@/stores/analysis'
 import { resetAnalysisStartedFlag, setOverrideStartStep } from '@/composables/useMockAnalysis'
 import StreamingMarkdown from './StreamingMarkdown.vue'
-import html2pdf from 'html2pdf.js'
 import MarkdownIt from 'markdown-it'
 import type { Project } from '@/stores/project'
 
@@ -257,9 +251,12 @@ const prdResult = computed(() => {
 })
 
 // 导出 PRD 文档为 PDF
-const exportPRD = () => {
+const exportPRD = async () => {
   const prd = prdResult.value
   if (!prd) return
+
+  // 动态导入 html2pdf
+  const html2pdf = (await import('html2pdf.js')).default
 
   // 配置 markdown-it
   const md = new MarkdownIt({
@@ -732,56 +729,9 @@ const handleDelete = () => {
   padding: 60px 20px;
 }
 
-.empty-icon {
-  display: flex;
-  gap: 8px;
-  margin-bottom: 16px;
-}
-
-.pulse-dot {
-  width: 12px;
-  height: 12px;
-  background: #7C3AED;
-  border-radius: 50%;
-  animation: pulseDot 1.4s ease-in-out infinite;
-
-  &:nth-child(1) {
-    animation-delay: 0s;
-  }
-
-  &:nth-child(2) {
-    animation-delay: 0.2s;
-  }
-
-  &:nth-child(3) {
-    animation-delay: 0.4s;
-  }
-}
-
-@keyframes pulseDot {
-  0%, 80%, 100% {
-    transform: scale(0.6);
-    opacity: 0.4;
-  }
-  40% {
-    transform: scale(1);
-    opacity: 1;
-  }
-}
-
 .empty-state p {
   margin: 0;
   font-size: 14px;
-  animation: fadeInText 2s ease-in-out infinite;
-
-  @keyframes fadeInText {
-    0%, 100% {
-      opacity: 0.6;
-    }
-    50% {
-      opacity: 1;
-    }
-  }
 }
 
 // === 无结果状态 ===

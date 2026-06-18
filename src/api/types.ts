@@ -26,7 +26,7 @@ export interface GetResultsRequest {
 }
 
 export interface GetResultsResponse {
-  result: ResultItem
+  result?: ResultItem
   nextAvailable: boolean
   stepComplete: boolean
   nextStep?: string
